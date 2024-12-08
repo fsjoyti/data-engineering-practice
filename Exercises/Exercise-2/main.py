@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-import dask.dataframe as dd
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -19,17 +18,12 @@ def get_download_urls(base_url):
             download_links.append(download_link)
     return download_links
             
-def process_csv(url):
-    df = pd.read_csv(url)
-    print(f'Reading dataframe with {len(df)} rows')
-    return df
-
 
 def main():
     # your code here
     base_url = "https://www.ncei.noaa.gov/data/local-climatological-data/access/2021/"
     urls_list = get_download_urls(base_url=base_url)
-
+    # picking the first one from this list for this exercise
     first_url = urls_list[0]
     df = pd.read_csv(first_url)
     df_sorted = df.sort_values(by='HourlyDryBulbTemperature', ascending=False)
