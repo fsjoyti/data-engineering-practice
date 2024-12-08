@@ -21,24 +21,19 @@ def get_download_urls(base_url):
             
 def process_csv(url):
     df = pd.read_csv(url)
+    print(f'Reading dataframe with {len(df)} rows')
     return df
 
-
-def dask_alternative(urls_list):
-    frames = [process_csv(url) for url in urls_list]
-    result = pd.concat(frames)
-    df_sorted = result.sort_values('HourlyDryBulbTemperature')
-    print(df_sorted.head())
 
 def main():
     # your code here
     base_url = "https://www.ncei.noaa.gov/data/local-climatological-data/access/2021/"
     urls_list = get_download_urls(base_url=base_url)
-    # since it returns more than one file grabbing only the first one from list for exercise
+
     first_url = urls_list[0]
     df = pd.read_csv(first_url)
     df_sorted = df.sort_values(by='HourlyDryBulbTemperature', ascending=False)
-    print(df_sorted.head())
+    print(df_sorted)
 
   
     
