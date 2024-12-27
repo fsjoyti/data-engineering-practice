@@ -1,8 +1,7 @@
-DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS products CASCADE;
 
 CREATE TABLE products(
-    product_id INTEGER unique,
+    product_id INTEGER PRIMARY KEY,
     product_code INTEGER NOT NULL unique,
-    product_description TEXT unique
-    PRIMARY KEY(product_id, product_code, product_description)
+    product_description VARCHAR(255) unique
 );

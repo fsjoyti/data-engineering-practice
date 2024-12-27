@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS accounts CASCADE;
 CREATE TABLE accounts(
     customer_id INTEGER PRIMARY KEY,
     first_name VARCHAR (255) NOT NULL, 
@@ -7,6 +7,6 @@ CREATE TABLE accounts(
     address_2 VARCHAR (255),
     city VARCHAR (255) NOT NULL,
     state VARCHAR (255) NOT NULL,
-    zip_code integer NOT NULL,
-    join_date date NOT NULL
+    zip_code INTEGER NOT NULL,
+    join_date VARCHAR (255) NOT NULL
 );
