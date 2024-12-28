@@ -35,11 +35,7 @@ def read_sql_file(sql_file_path):
     return sql_commands
 
 
-def main():
-    conn, cur = connect_to_posgres()
-    current_directory = os.getcwd()
-    sql_file_paths = get_file_paths(current_directory, f"ddl_scripts", "sql")
-    csv_file_paths = get_file_paths(current_directory, r"data", "csv")
+def create_tables(cur, sql_file_paths):
     for sql_file_path in sql_file_paths:
         sql_commands = read_sql_file(sql_file_path)
         for command in sql_commands:
@@ -48,8 +44,11 @@ def main():
                     cur.execute(command)
             except Exception as err:
                 print(f"Unexpected {err=}, {type(err)=}")
+
                 raise
 
+
+def copy_from_csv_files(conn, cur, csv_file_paths):
     for csv_file_path in csv_file_paths:
         file_name = csv_file_path.split("\\")[-1]
         table_name = file_name.replace(".csv", "")
@@ -57,6 +56,15 @@ def main():
             next(file)
             cur.copy_from(file, table_name, sep=",")
             conn.commit()
+
+
+def main():
+    conn, cur = connect_to_posgres()
+    current_directory = os.getcwd()
+    sql_file_paths = get_file_paths(current_directory, f"ddl_scripts", "sql")
+    create_tables(cur, sql_file_paths)
+    csv_file_paths = get_file_paths(current_directory, r"data", "csv")
+    copy_from_csv_files(conn, cur, csv_file_paths)
 
 
 if __name__ == "__main__":
