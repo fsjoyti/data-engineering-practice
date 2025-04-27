@@ -18,13 +18,13 @@ def connect_to_posgres():
 
 
 def get_file_paths(root_directory, folder_name, file_extension):
-    sql_file_paths = []
-    sql_directory = os.path.join(root_directory, folder_name)
-    for root, _, files in os.walk(sql_directory):
+    file_paths = []
+    file_directory = os.path.join(root_directory, folder_name)
+    for root, _, files in os.walk(file_directory):
         for file_name in files:
             if file_extension in file_name:
-                sql_file_paths.append(os.path.join(root, file_name))
-    return sql_file_paths
+                file_paths.append(os.path.join(root, file_name))
+    return file_paths
 
 
 def read_sql_file(sql_file_path):
