@@ -4,3 +4,9 @@
 venv
 downloads
 .vscode/launch.json
+
+data/
+
+.vscode/
+
+__pycache__
