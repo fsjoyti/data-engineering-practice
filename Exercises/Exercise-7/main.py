@@ -68,12 +68,16 @@ def add_brand_column(df):
 def add_storage_ranking(df):
     # Cache the DataFrame to avoid recomputation if used multiple times
     df = df.select("model", "capacity_bytes").distinct().cache()
-    window_spec = Window.orderBy(F.desc("capacity_bytes"))
+    # Convert capacity_bytes to integer
+    df = df.withColumn(
+        "capacity_bytes", F.col("capacity_bytes").cast(types.IntegerType())
+    )
+    window_spec = Window.partitionBy("model").orderBy(F.desc("capacity_bytes"))
     ranked_df = df.withColumn("storage_ranking", F.dense_rank().over(window_spec))
     return ranked_df
 
 
-def add_storage_ranking_column(df, ranked_df):
+def _add_storage_ranking_column(df, ranked_df):
     return df.join(F.broadcast(ranked_df), on="model", how="left")
 
 
@@ -106,10 +110,16 @@ def main():
     new_df = add_file_date_column(sparkDF)
     new_df = add_brand_column(new_df)
     ranked_df = add_storage_ranking(new_df)
-    final_df = add_storage_ranking_column(new_df, ranked_df)
+    final_df = _add_storage_ranking_column(new_df, ranked_df)
     final_df = add_primary_key_column(final_df)
     print(final_df.explain(mode="extended"))
     print(final_df.show())
+    # close the Spark session
+    spark.stop()
+    # close the zip file
+    for file_path in zip_file_paths:
+        with ZipFile(file_path) as zip_file:
+            zip_file.close()
 
 
 if __name__ == "__main__":
