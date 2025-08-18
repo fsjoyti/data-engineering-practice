@@ -2,7 +2,12 @@ SELECT "VIN", "County", "City", "State", "Postal_Code", "Model_Year", "Make", "M
 
 SELECT City, COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY City order by COUNT(*) desc;
 
-SELECT Make, Model, COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY "Make", "Model" order by COUNT(*) desc limit 3;
+with make_model_count as 
+(
+    SELECT Make, Model, COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY "Make", "Model" order by COUNT(*) desc
+)
+select Make, Model from make_model_count LIMIT 3;
+
 
 SELECT "Postal_Code", Make, Model, COUNT(*) 
 FROM main."ELECTRIC_VEHICLE_POPULATION" 

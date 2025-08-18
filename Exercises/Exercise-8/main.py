@@ -96,6 +96,20 @@ async def get_number_of_cars_per_city(connection, table_name):
     df.to_csv("number_of_cars_per_city.csv", index=False)
 
 
+async def get_top_three_make_model(connection, table_name):
+    query_str = f"""
+    with make_model_count as 
+    (
+        SELECT Make, Model, COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY "Make", "Model" order by COUNT(*) desc
+    )
+    select Make, Model from make_model_count LIMIT 3;
+    """
+    cursor = await connection.cursor()
+    cursor = await cursor.execute(query_str)
+    df = await cursor.df()
+    df.to_csv("top_three_make_model.csv", index=False)
+
+
 async def main():
     try:
         current_directory = os.getcwd()
@@ -112,7 +126,8 @@ async def main():
         await insert_rows_from_csv_file(
             connection=con, table_name=table_name, file_path=csv_file_name
         )
-        await get_number_of_cars_per_city(connection=con, table_name=table_name)
+        # await get_number_of_cars_per_city(connection=con, table_name=table_name)
+        await get_top_three_make_model(connection=con, table_name=table_name)
         await con.close()
     except Exception as e:
         print(e)
