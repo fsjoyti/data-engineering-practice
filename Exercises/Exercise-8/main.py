@@ -2,15 +2,14 @@ import asyncio
 import os
 
 import aioduckdb
-import duckdb as dd
 
 
-async def get_file_paths(root_directory, folder_name, file_extension):
+def get_env_path(folder, ext):
+    """Get all file paths in a folder with a given extension."""
     file_paths = []
-    file_directory = os.path.join(root_directory, folder_name)
-    for root, _, files in os.walk(file_directory):
+    for root, _, files in os.walk(folder):
         for file_name in files:
-            if file_extension in file_name:
+            if file_name.endswith(ext):
                 file_paths.append(os.path.join(root, file_name))
     return file_paths
 
@@ -21,141 +20,128 @@ async def setup_extension(connection, extension_name):
 
 
 async def read_sql_file(sql_file_path):
-    file = open(file=sql_file_path, mode="r")
-    sql_file = file.read()
-    file.close()
-    sql_commands = sql_file.split(";")
-    return sql_commands
+    with open(sql_file_path, "r") as file:
+        sql_commands = file.read().split(";")
+    return [cmd.strip() for cmd in sql_commands if cmd.strip()]
 
 
-async def create_table(connection, ddl_path_location):
+async def execute_sql_file(connection, sql_file_paths):
+    """Executes all SQL commands in the given files."""
     table_name = ""
-    for sql_file_path in ddl_path_location:
+    for sql_file_path in sql_file_paths:
         sql_commands = await read_sql_file(sql_file_path)
         for command in sql_commands:
-            command = command.strip()
-            if command:
-                print(f"Executing {command}")
-                await connection.execute(command)
+            print(f"Executing {command}")
+            await connection.execute(command)
+        # Optionally extract table name from the first command
         table_name = sql_commands[0].split(" ")[-1]
     return table_name
 
 
-async def insert_rows_from_csv_file(connection, table_name, file_path):
-    print(f"truncate table {table_name}")
-    truncate_command = f"truncate table {table_name};"
-    await connection.execute(truncate_command)
+async def truncate_table(connection, table_name):
+    await connection.execute(f"truncate table {table_name};")
+
+
+async def insert_from_csv(connection, table_name, file_path):
+    await truncate_table(connection, table_name)
     sql_command = f"""
     INSERT INTO {table_name}(
-        VIN,
-        County,
-        City,
-        State,
-        Postal_Code,
-        Model_Year, 
-        Make,
-        Model,
-        Electric_Vehicle_Type,
-        Clean_Alternative_Fuel_Vehicle_Eligibility,
-        Electric_Range,
-        Base_MSRP,
-        Legislative_District,
-        DOL_Vehicle_ID,
-        Vehicle_Location,
-        Electric_Utility,
-        TwentyTwenty_Census_Tract
+        VIN, County, City, State, Postal_Code, Model_Year, Make, Model,
+        Electric_Vehicle_Type, Clean_Alternative_Fuel_Vehicle_Eligibility,
+        Electric_Range, Base_MSRP, Legislative_District, DOL_Vehicle_ID,
+        Vehicle_Location, Electric_Utility, TwentyTwenty_Census_Tract
     ) SELECT
-        "VIN (1-10)" as VIN,
-        County,
-        City,
-        State,
-        "Postal Code" as Postal_Code,
-        "Model Year" as Model_Year,
-        Make,
-        Model,
-        "Electric Vehicle Type" as Electric_Vehicle_Type,
+        "VIN (1-10)" as VIN, County, City, State, "Postal Code" as Postal_Code,
+        "Model Year" as Model_Year, Make, Model, "Electric Vehicle Type" as Electric_Vehicle_Type,
         "Clean Alternative Fuel Vehicle (CAFV) Eligibility" as Clean_Alternative_Fuel_Vehicle_Eligibility,
-        "Electric Range" as Electric_Range,
-        "Base MSRP" as Base_MSRP,
-        "Legislative District" as Legislative_District,
-        "DOL Vehicle ID" as DOL_Vehicle_ID,
+        "Electric Range" as Electric_Range, "Base MSRP" as Base_MSRP,
+        "Legislative District" as Legislative_District, "DOL Vehicle ID" as DOL_Vehicle_ID,
         ST_GeomFromText(coalesce("Vehicle Location", 'Point (0 0)')) as Vehicle_Location,
-        "Electric Utility" as Electric_Utility,
-        "2020 Census Tract" as TwentyTwenty_Census_Tract
+        "Electric Utility" as Electric_Utility, "2020 Census Tract" as TwentyTwenty_Census_Tract
     FROM '{file_path}';
     """
     await connection.execute(sql_command)
-    print(f"Successfully inserted rows into {table_name} from {file_path}")
+    print(f"Inserted rows into {table_name} from {file_path}")
 
 
-async def get_number_of_cars_per_city(connection, table_name):
-    query_str = f"SELECT City, COUNT(*) as Number_Of_Cars FROM {table_name} GROUP BY City order by COUNT(*) desc;"
+async def query_to_csv(connection, query, output_path):
     cursor = await connection.cursor()
-    cursor = await cursor.execute(query_str)
+    cursor = await cursor.execute(query)
     df = await cursor.df()
-    df.to_csv("number_of_cars_per_city.csv", index=False)
+    df.to_csv(output_path, index=False)
 
 
-async def get_top_three_make_model(connection, table_name):
-    query_str = f"""
-    with make_model_count as 
-    (
-        SELECT Make, Model, COUNT(*) FROM {table_name} GROUP BY "Make", "Model" order by COUNT(*) desc
+async def query_to_parquet(connection, query, output_path, partition_cols=None):
+    cursor = await connection.cursor()
+    cursor = await cursor.execute(query)
+    df = await cursor.df()
+    df.to_parquet(output_path, partition_cols=partition_cols or [])
+
+
+async def get_number_of_cars_per_city(
+    connection, table_name, output_path="number_of_cars_per_city.csv"
+):
+    query = f"SELECT City, COUNT(*) as Number_Of_Cars FROM {table_name} GROUP BY City ORDER BY COUNT(*) DESC;"
+    await query_to_csv(connection, query, output_path)
+
+
+async def get_top_three_make_model(
+    connection, table_name, output_path="top_three_make_model.csv"
+):
+    query = f"""
+    WITH make_model_count AS (
+        SELECT Make, Model, COUNT(*) as cnt FROM {table_name} GROUP BY Make, Model
     )
-    select Make, Model from make_model_count LIMIT 3;
+    SELECT Make, Model FROM make_model_count ORDER BY cnt DESC LIMIT 3;
     """
-    cursor = await connection.cursor()
-    cursor = await cursor.execute(query_str)
-    df = await cursor.df()
-    df.to_csv("top_three_make_model.csv", index=False)
+    await query_to_csv(connection, query, output_path)
 
 
-async def get_most_popular_vehicle_postal_code(connection, table_name):
-    query_str = f"""with postal_code_model as(
-            SELECT "Postal_Code", Make, Model, COUNT(*) 
-            FROM {table_name} 
-            GROUP BY "Postal_Code" , "Make", "Model"
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) = 1
-            )
-        select "Postal_Code", Make, Model from postal_code_model;"""
-    cursor = await connection.cursor()
-    cursor = await cursor.execute(query_str)
-    df = await cursor.df()
-    df.to_csv("most_popular_vehicle_postal_code.csv", index=False)
-
-
-async def get_number_of_cars_by_model_year(connection, table_name):
-    query_str = f"""
-        SELECT Make, Model, "Model_Year" as Year, COUNT(*) as Number_Of_Cars FROM {table_name} GROUP BY "Make", "Model", "Model_Year" order by COUNT(*) desc;
+async def get_most_popular_vehicle_postal_code(
+    connection, table_name, output_path="most_popular_vehicle_postal_code.csv"
+):
+    query = f"""
+    WITH ranked AS (
+        SELECT "Postal_Code", Make, Model, COUNT(*) as cnt,
+               ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) as rn
+        FROM {table_name}
+        GROUP BY "Postal_Code", Make, Model
+    )
+    SELECT "Postal_Code", Make, Model FROM ranked WHERE rn = 1;
     """
-    cursor = await connection.cursor()
-    cursor = await cursor.execute(query_str)
-    df = await cursor.df()
-    df.to_parquet("./cars_by_model_year", partition_cols=["Year"])
+    await query_to_csv(connection, query, output_path)
+
+
+async def get_number_of_cars_by_model_year(
+    connection, table_name, output_path="./cars_by_model_year"
+):
+    query = f"""
+    SELECT Make, Model, "Model_Year" as Year, COUNT(*) as Number_Of_Cars
+    FROM {table_name}
+    GROUP BY Make, Model, "Model_Year"
+    ORDER BY COUNT(*) DESC;
+    """
+    await query_to_parquet(connection, query, output_path, partition_cols=["Year"])
 
 
 async def main():
     try:
         current_directory = os.getcwd()
-        csv_file_paths = await get_file_paths(current_directory, "data", ".csv")
-        print(csv_file_paths)
+        csv_file_paths = get_env_path(os.path.join(current_directory, "data"), ".csv")
+        if not csv_file_paths:
+            raise FileNotFoundError("No CSV files found in data directory.")
         csv_file_name = csv_file_paths[0]
         con = await aioduckdb.connect("new_persistent.db")
-        await setup_extension(connection=con, extension_name="spatial")
-        sql_file_paths = await get_file_paths(current_directory, f"ddl_scripts", "sql")
-        table_name = await create_table(
-            connection=con, ddl_path_location=sql_file_paths
+        await setup_extension(con, "spatial")
+        sql_file_paths = get_env_path(
+            os.path.join(current_directory, "ddl_scripts"), ".sql"
         )
-        print(table_name)
-        await insert_rows_from_csv_file(
-            connection=con, table_name=table_name, file_path=csv_file_name
-        )
-        # await get_number_of_cars_per_city(connection=con, table_name=table_name)
-        # await get_top_three_make_model(connection=con, table_name=table_name)
-        # await get_most_popular_vehicle_postal_code(
-        #     connection=con, table_name=table_name
-        # )
-        await get_number_of_cars_by_model_year(connection=con, table_name=table_name)
+        table_name = await execute_sql_file(con, sql_file_paths)
+        await insert_from_csv(con, table_name, csv_file_name)
+        await get_number_of_cars_per_city(con, table_name)
+        await get_top_three_make_model(con, table_name)
+        await get_most_popular_vehicle_postal_code(con, table_name)
+        await get_number_of_cars_by_model_year(con, table_name)
         await con.close()
     except Exception as e:
         print(e)
