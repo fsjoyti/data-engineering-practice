@@ -100,7 +100,7 @@ async def get_top_three_make_model(connection, table_name):
     query_str = f"""
     with make_model_count as 
     (
-        SELECT Make, Model, COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY "Make", "Model" order by COUNT(*) desc
+        SELECT Make, Model, COUNT(*) FROM {table_name} GROUP BY "Make", "Model" order by COUNT(*) desc
     )
     select Make, Model from make_model_count LIMIT 3;
     """
@@ -113,7 +113,7 @@ async def get_top_three_make_model(connection, table_name):
 async def get_most_popular_vehicle_postal_code(connection, table_name):
     query_str = f"""with postal_code_model as(
             SELECT "Postal_Code", Make, Model, COUNT(*) 
-            FROM main."ELECTRIC_VEHICLE_POPULATION" 
+            FROM {table_name} 
             GROUP BY "Postal_Code" , "Make", "Model"
             QUALIFY ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) = 1
             )
@@ -122,6 +122,16 @@ async def get_most_popular_vehicle_postal_code(connection, table_name):
     cursor = await cursor.execute(query_str)
     df = await cursor.df()
     df.to_csv("most_popular_vehicle_postal_code.csv", index=False)
+
+
+async def get_number_of_cars_by_model_year(connection, table_name):
+    query_str = f"""
+        SELECT Make, Model, "Model_Year" as Year, COUNT(*) as Number_Of_Cars FROM {table_name} GROUP BY "Make", "Model", "Model_Year" order by COUNT(*) desc;
+    """
+    cursor = await connection.cursor()
+    cursor = await cursor.execute(query_str)
+    df = await cursor.df()
+    df.to_parquet("./cars_by_model_year", partition_cols=["Year"])
 
 
 async def main():
@@ -142,9 +152,10 @@ async def main():
         )
         # await get_number_of_cars_per_city(connection=con, table_name=table_name)
         # await get_top_three_make_model(connection=con, table_name=table_name)
-        await get_most_popular_vehicle_postal_code(
-            connection=con, table_name=table_name
-        )
+        # await get_most_popular_vehicle_postal_code(
+        #     connection=con, table_name=table_name
+        # )
+        await get_number_of_cars_by_model_year(connection=con, table_name=table_name)
         await con.close()
     except Exception as e:
         print(e)
