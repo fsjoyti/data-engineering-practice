@@ -80,6 +80,8 @@ async def query_to_parquet(connection, query, output_path, partition_cols=None):
     cursor = await cursor.execute(query)
     df = await cursor.df()
     df.to_parquet(output_path, partition_cols=partition_cols or [])
+    # Explicitly delete the DataFrame to release resources
+    del df
 
 
 async def get_number_of_cars_per_city(
