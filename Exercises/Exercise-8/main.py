@@ -110,6 +110,20 @@ async def get_top_three_make_model(connection, table_name):
     df.to_csv("top_three_make_model.csv", index=False)
 
 
+async def get_most_popular_vehicle_postal_code(connection, table_name):
+    query_str = f"""with postal_code_model as(
+            SELECT "Postal_Code", Make, Model, COUNT(*) 
+            FROM main."ELECTRIC_VEHICLE_POPULATION" 
+            GROUP BY "Postal_Code" , "Make", "Model"
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) = 1
+            )
+        select "Postal_Code", Make, Model from postal_code_model;"""
+    cursor = await connection.cursor()
+    cursor = await cursor.execute(query_str)
+    df = await cursor.df()
+    df.to_csv("most_popular_vehicle_postal_code.csv", index=False)
+
+
 async def main():
     try:
         current_directory = os.getcwd()
@@ -127,7 +141,10 @@ async def main():
             connection=con, table_name=table_name, file_path=csv_file_name
         )
         # await get_number_of_cars_per_city(connection=con, table_name=table_name)
-        await get_top_three_make_model(connection=con, table_name=table_name)
+        # await get_top_three_make_model(connection=con, table_name=table_name)
+        await get_most_popular_vehicle_postal_code(
+            connection=con, table_name=table_name
+        )
         await con.close()
     except Exception as e:
         print(e)

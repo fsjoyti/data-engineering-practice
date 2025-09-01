@@ -8,11 +8,13 @@ with make_model_count as
 )
 select Make, Model from make_model_count LIMIT 3;
 
-
+with postal_code_model as(
 SELECT "Postal_Code", Make, Model, COUNT(*) 
 FROM main."ELECTRIC_VEHICLE_POPULATION" 
 GROUP BY "Postal_Code" , "Make", "Model"
-QUALIFY ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) = 1;
+QUALIFY ROW_NUMBER() OVER (PARTITION BY "Postal_Code" ORDER BY COUNT(*) DESC) = 1
+)
+select "Postal_Code", Make, Model from postal_code_model;
 
 SELECT Make, Model, "Model_Year", COUNT(*) FROM main."ELECTRIC_VEHICLE_POPULATION" GROUP BY "Make", "Model", "Model_Year" order by COUNT(*) desc;
 
