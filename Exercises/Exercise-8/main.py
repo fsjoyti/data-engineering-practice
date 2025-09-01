@@ -42,9 +42,8 @@ async def truncate_table(connection, table_name):
     await connection.execute(f"truncate table {table_name};")
 
 
-async def insert_from_csv(connection, table_name, file_path):
-    await truncate_table(connection, table_name)
-    sql_command = f"""
+async def get_insert_query(table_name, file_path):
+    return f"""
     INSERT INTO {table_name}(
         VIN, County, City, State, Postal_Code, Model_Year, Make, Model,
         Electric_Vehicle_Type, Clean_Alternative_Fuel_Vehicle_Eligibility,
@@ -60,7 +59,12 @@ async def insert_from_csv(connection, table_name, file_path):
         "Electric Utility" as Electric_Utility, "2020 Census Tract" as TwentyTwenty_Census_Tract
     FROM '{file_path}';
     """
-    await connection.execute(sql_command)
+
+
+async def insert_from_csv(connection, table_name, file_path):
+    await truncate_table(connection, table_name)
+    insert_query_command = await get_insert_query(table_name, file_path)
+    await connection.execute(insert_query_command)
     print(f"Inserted rows into {table_name} from {file_path}")
 
 
