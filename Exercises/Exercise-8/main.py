@@ -87,6 +87,8 @@ async def query_to_parquet(connection, query, output_path, partition_cols=None):
 async def get_number_of_cars_per_city(
     connection, table_name, output_path="number_of_cars_per_city.csv"
 ):
+    print("Getting number of cars per city")
+    print(f"Output path: {output_path}")
     query = f"SELECT City, COUNT(*) as Number_Of_Cars FROM {table_name} GROUP BY City ORDER BY COUNT(*) DESC;"
     await query_to_csv(connection, query, output_path)
 

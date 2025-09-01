@@ -10,6 +10,10 @@ from main import (
     execute_sql_file,
     get_env_path,
     get_insert_query,
+    get_most_popular_vehicle_postal_code,
+    get_number_of_cars_by_model_year,
+    get_number_of_cars_per_city,
+    get_top_three_make_model,
     insert_from_csv,
     query_to_csv,
     query_to_parquet,
@@ -99,3 +103,17 @@ async def test_query_to_csv_and_parquet():
             assert parquet_output_path.exists()
 
         # The temporary directory and its contents will be automatically cleaned up
+
+
+@pytest.mark.asyncio
+@patch("main.query_to_csv", new_callable=AsyncMock)
+async def test_get_number_of_cars_per_city(query_to_csv_mock):
+    async with aioduckdb.connect(database=":memory:") as conn:
+        output_path = Path(tempfile.gettempdir()) / "cars_per_city.csv"
+        await get_number_of_cars_per_city(conn, "test_table", str(output_path))
+        query_to_csv_mock.assert_awaited_once()
+        query_to_csv_mock.assert_awaited_with(
+            conn,
+            """SELECT City, COUNT(*) as Number_Of_Cars FROM test_table GROUP BY City ORDER BY COUNT(*) DESC;""",
+            str(output_path),
+        )
